@@ -56,22 +56,6 @@
 	return self;
 }
 
-- (id) initForWritingToString {
-    if ((self = [super init])) {
-        atomically = NO;
-        destinationFile = nil;
-        handleFile = nil;
-        encoding = 0;
-        hasStarted = NO;
-        [self setDelimiter:@","];
-    }
-    return self;
-}
-
-- (NSString *) stringValue {
-    return [[stringValue copy] autorelease];
-}
-
 - (void) dealloc {
 	[self closeFile];
 	[destinationFile release];
@@ -79,7 +63,6 @@
 	[handleFile release];
 	[outputHandle release];
 	[illegalCharacters release];
-    [stringValue release];
 	[super dealloc];
 }
 
@@ -95,13 +78,12 @@
 	
 	// the delimiter cannot be
 	BOOL shouldThrow = ([newDelimiter length] != 1);
-    unichar delimiterCharacter = [newDelimiter characterAtIndex:0];
-	if ([[NSCharacterSet newlineCharacterSet] characterIsMember:delimiterCharacter]) {
+	if ([[NSCharacterSet newlineCharacterSet] characterIsMember:[newDelimiter characterAtIndex:0]]) {
 		shouldThrow = YES;
 	}
-	if (delimiterCharacter == '#') { shouldThrow = YES; }
-	if (delimiterCharacter == '"') { shouldThrow = YES; }
-	if (delimiterCharacter == '\\') { shouldThrow = YES; }
+	if ([newDelimiter hasPrefix:@"#"]) { shouldThrow = YES; }
+	if ([newDelimiter hasPrefix:@"\""]) { shouldThrow = YES; }
+	if ([newDelimiter hasPrefix:@"\\"]) { shouldThrow = YES; }
 	
 	if (shouldThrow) {
 		[NSException raise:NSInvalidArgumentException format:@"%@ cannot be used as a delimiter", newDelimiter];
@@ -120,27 +102,15 @@
 	}
 }
 
-- (void)_writeString:(NSString *)string {
-	if (encoding == 0) {
-		encoding = NSUTF8StringEncoding;
-	}
-    
-    if (outputHandle != nil) {
-        [outputHandle writeData:[string dataUsingEncoding:encoding]];
-    } else {
-        if (stringValue == nil) {
-            stringValue = [[NSMutableString alloc] init];
-        }
-        [stringValue appendString:string];
-    }
-}
-
 - (void) writeField:(id)field {
 	hasStarted = YES;
 	NSMutableString * write = [[field description] mutableCopy];
+	if (encoding == 0) {
+		encoding = NSUTF8StringEncoding; // [write fastestEncoding]; // yeonsh. 2011-04-18.
+	}
 	
 	if (currentField > 0) {
-        [self _writeString:delimiter];
+		[outputHandle writeData:[delimiter dataUsingEncoding:encoding]];
 	}
 	
 	if ([write rangeOfCharacterFromSet:illegalCharacters].location != NSNotFound || [write hasPrefix:@"#"]) {
@@ -150,7 +120,7 @@
 		[write appendString:@"\""];
 	}
 	
-    [self _writeString:write];
+	[outputHandle writeData:[write dataUsingEncoding:encoding]];
 	[write release];
 	currentField++;
 }
@@ -170,7 +140,10 @@
 }
 
 - (void) writeLine {
-    [self _writeString:@"\n"];
+	if (encoding == 0) {
+		encoding = NSUTF8StringEncoding;
+	}
+	[outputHandle writeData:[@"\n" dataUsingEncoding:encoding]];
 	currentField = 0;
 }
 
@@ -196,8 +169,8 @@
 
 - (void) writeCommentLine:(id)comment {
 	if (currentField > 0) { [self writeLine]; }
-    [self _writeString:@"#"];
-    [self _writeString:comment];
+	[outputHandle writeData:[@"#" dataUsingEncoding:encoding]];
+	[outputHandle writeData:[comment dataUsingEncoding:encoding]];
 	[self writeLine];
 }
 
