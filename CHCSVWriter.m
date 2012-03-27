@@ -29,6 +29,9 @@
 @implementation CHCSVWriter
 @synthesize encoding, delimiter;
 
+- (id) initForWritingToString; { return NULL; }
+- (NSString *) stringValue; { return NULL; }
+
 - (id) initWithCSVFile:(NSString *)outputFile atomic:(BOOL)atomicWrite {
 	if ((self = [super init])) {
 		atomically = atomicWrite;
